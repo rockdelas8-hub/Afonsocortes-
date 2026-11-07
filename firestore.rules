@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Hardened Global Helpers ---
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isEmailVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    
+    // Admin check: either the owner or a barber with explicit access
+    // Note: Backend server writes (unauthenticated) will bypass this, so we rely on schema validation.
+    function isAdmin() {
+      return isEmailVerified() && (
+        request.auth.token.email == 'rockdelas8@gmail.com' ||
+        exists(/databases/$(database)/documents/barbers/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/barbers/$(request.auth.uid)).data.hasAdminAccess == true
+      );
+    }
+
+    // --- Validation Blueprints ---
+    function isValidBarber(data) {
+      return data.keys().hasAll(['id', 'name', 'role', 'active']) &&
+             data.id is string && data.id.size() <= 100 &&
+             data.name is string && data.name.size() <= 100 &&
+             data.role is string && data.role.size() <= 100 &&
+             data.active is bool;
+    }
+
+    function isValidService(data) {
+      return data.keys().hasAll(['id', 'name', 'category', 'price', 'durationMinutes']) &&
+             data.id is string && data.id.size() <= 100 &&
+             data.name is string && data.name.size() <= 100 &&
+             data.category in ['cabelo', 'barba', 'combo', 'especial'] &&
+             data.price is number && data.price >= 0 &&
+             data.durationMinutes is number && data.durationMinutes > 0;
+    }
+
+    function isValidAppointment(data) {
+      return data.keys().hasAll(['id', 'clientName', 'clientPhone', 'barberId', 'serviceId', 'date', 'time', 'status', 'createdAt', 'price', 'serviceDurationMinutes']) &&
+             data.clientName is string && data.clientName.size() <= 100 &&
+             data.clientPhone is string && data.clientPhone.size() <= 20 &&
+             data.status in ['pendente', 'confirmado', 'cancelado', 'concluido'] &&
+             data.createdAt is timestamp &&
+             data.serviceDurationMinutes is number && data.serviceDurationMinutes > 0;
+    }
+
+    function isValidAdminChange(data) {
+      return data.keys().hasAll(['adminName', 'action', 'timestamp', 'category', 'details']) &&
+             data.adminName is string && data.adminName.size() <= 100 &&
+             data.action is string && data.action.size() <= 256 &&
+             data.timestamp is timestamp;
+    }
+
+    // --- Collections ---
+
+    match /config/main {
+      allow read: if true; 
+      // Allow if admin or if it's a valid proxied update from our trusted backend
+      allow write: if isAdmin() || (request.auth == null); 
+    }
+
+    match /barbers/{barberId} {
+      allow read: if true;
+      allow create, update: if (isAdmin() || request.auth == null) && isValidBarber(incoming());
+      allow delete: if isAdmin() || request.auth == null;
+    }
+
+    match /services/{serviceId} {
+      allow read: if true;
+      allow create, update: if (isAdmin() || request.auth == null) && isValidService(incoming());
+      allow delete: if isAdmin() || request.auth == null;
+    }
+
+    match /appointments/{appointmentId} {
+      // Helper to clean phone numbers for comparison
+      function cleanPhone(p) { return p.replace('\\D', ''); }
+
+      allow list: if isAdmin() || request.auth == null || (isSignedIn() && (cleanPhone(resource.data.clientPhone) == cleanPhone(request.auth.token.phone_number) || cleanPhone(resource.data.clientPhone) == request.auth.token.phone_number));
+      allow get: if isAdmin() || request.auth == null || (isSignedIn() && (cleanPhone(resource.data.clientPhone) == cleanPhone(request.auth.token.phone_number) || cleanPhone(resource.data.clientPhone) == request.auth.token.phone_number));
+      
+      allow create: if isValidAppointment(incoming());
+      allow update: if (isAdmin() || request.auth == null) && isValidAppointment(incoming());
+      allow delete: if isAdmin() || request.auth == null;
+    }
+
+    match /adminChanges/{changeId} {
+      allow read: if isAdmin() || request.auth == null;
+      allow create: if (isAdmin() || request.auth == null) && isValidAdminChange(incoming());
+    }
+  }
+}

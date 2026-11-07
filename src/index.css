@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg: #111111;
+    --card: #1d1d1d;
+    --gold: #c99a35;
+    --gold-light: #f0cf7b;
+    --text: #ffffff;
+    --muted: #b6b6b6;
+    --danger: #d9534f;
+    --green: #25d366;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: 'Figtree', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Custom scrollbars for chat and lists */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #181818;
+}
+::-webkit-scrollbar-thumb {
+  background: #333333;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c99a35;
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Barbearia Afonso Cortes - Agendamento & Consultor IA",
+  "description": "Sistema completo de agendamento online, consultoria visagista com IA e gestão para a Barbearia Afonso Cortes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

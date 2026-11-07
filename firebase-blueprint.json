@@ -1,0 +1,116 @@
+{
+  "entities": {
+    "Barber": {
+      "title": "Barber",
+      "description": "A barber working at the shop.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "avatar": { "type": "string" },
+        "active": { "type": "boolean" },
+        "bio": { "type": "string" },
+        "specialties": { "type": "array", "items": { "type": "string" } },
+        "rating": { "type": "number" },
+        "email": { "type": "string" },
+        "hasAdminAccess": { "type": "boolean" }
+      },
+      "required": ["id", "name", "role", "active"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "A service offered by the barbershop.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string", "enum": ["cabelo", "barba", "combo", "especial"] },
+        "price": { "type": "number" },
+        "durationMinutes": { "type": "number" },
+        "description": { "type": "string" },
+        "icon": { "type": "string" }
+      },
+      "required": ["id", "name", "category", "price", "durationMinutes"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "A booking made by a client.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientPhone": { "type": "string" },
+        "barberId": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "notes": { "type": "string" },
+        "status": { "type": "string", "enum": ["pendente", "confirmado", "cancelado", "concluido"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "price": { "type": "number" }
+      },
+      "required": ["id", "clientName", "clientPhone", "barberId", "serviceId", "date", "time", "status", "createdAt", "price"]
+    },
+    "BarbershopConfig": {
+      "title": "BarbershopConfig",
+      "description": "Global settings for the barbershop.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "eyebrow": { "type": "string" },
+        "heroTitleMain": { "type": "string" },
+        "heroTitleAccent": { "type": "string" },
+        "description": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "instagram": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "openingHours": { "type": "string" },
+        "schedule": { "type": "object" },
+        "whatsappClientRequestTemplate": { "type": "string" },
+        "whatsappBarbershopConfirmTemplate": { "type": "string" }
+      }
+    },
+    "AdminChange": {
+      "title": "AdminChange",
+      "description": "A record of a change made by an administrator.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "adminId": { "type": "string" },
+        "adminName": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "category": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "previousData": { "type": "object" },
+        "newData": { "type": "object" }
+      },
+      "required": ["id", "adminName", "action", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/config/main": {
+      "schema": "BarbershopConfig",
+      "description": "Singleton configuration document."
+    },
+    "/barbers/{barberId}": {
+      "schema": "Barber",
+      "description": "List of barbers."
+    },
+    "/services/{serviceId}": {
+      "schema": "Service",
+      "description": "List of services."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Client bookings."
+    },
+    "/adminChanges/{changeId}": {
+      "schema": "AdminChange",
+      "description": "Audit log of admin actions."
+    }
+  }
+}

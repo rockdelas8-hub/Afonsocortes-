@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Hardened Global Helpers ---
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isEmailVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    
+    // Admin check: either the owner or a barber with explicit access
+    function isAdmin() {
+      return isEmailVerified() && (
+        request.auth.token.email == 'rockdelas8@gmail.com' ||
+        exists(/databases/$(database)/documents/barbers/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/barbers/$(request.auth.uid)).data.hasAdminAccess == true
+      );
+    }
+
+    // --- Validation Blueprints ---
+    function isValidBarber(data) {
+      return data.keys().hasAll(['id', 'name', 'role', 'active']) &&
+             data.id is string && data.id.size() <= 100 &&
+             data.name is string && data.name.size() <= 100 &&
+             data.role is string && data.role.size() <= 100 &&
+             data.active is bool;
+    }
+
+    function isValidService(data) {
+      return data.keys().hasAll(['id', 'name', 'category', 'price', 'durationMinutes']) &&
+             data.id is string && data.id.size() <= 100 &&
+             data.name is string && data.name.size() <= 100 &&
+             data.category in ['cabelo', 'barba', 'combo', 'especial'] &&
+             data.price is number && data.price >= 0 &&
+             data.durationMinutes is number && data.durationMinutes > 0;
+    }
+
+    function isValidAppointment(data) {
+      return data.keys().hasAll(['id', 'clientName', 'clientPhone', 'barberId', 'serviceId', 'date', 'time', 'status', 'createdAt', 'price']) &&
+             data.clientName is string && data.clientName.size() <= 100 &&
+             data.clientPhone is string && data.clientPhone.size() <= 20 &&
+             data.status in ['pendente', 'confirmado', 'cancelado', 'concluido'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidAdminChange(data) {
+      return data.keys().hasAll(['id', 'adminName', 'action', 'timestamp']) &&
+             data.adminName is string && data.adminName.size() <= 100 &&
+             data.action is string && data.action.size() <= 256 &&
+             data.timestamp == request.time;
+    }
+
+    // --- Collections ---
+
+    match /config/main {
+      allow read: if true; // Publicly readable settings
+      allow write: if isAdmin();
+    }
+
+    match /barbers/{barberId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidBarber(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /services/{serviceId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidService(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /appointments/{appointmentId} {
+      // Clients can only read their own by querying phone, or admins can see all
+      allow list: if isAdmin() || (isSignedIn() && resource.data.clientPhone.replace('\\D', '') == request.auth.token.phone_number);
+      allow get: if isAdmin() || (isSignedIn() && resource.data.clientPhone.replace('\\D', '') == request.auth.token.phone_number);
+      
+      // Client can create, but only with valid data and initial 'pendente' status
+      allow create: if isValidAppointment(incoming()) && incoming().status == 'pendente';
+      
+      // Admin can update status, Client can only cancel
+      allow update: if (isAdmin() && isValidAppointment(incoming())) ||
+                    (isSignedIn() && incoming().status == 'cancelado' && incoming().diff(existing()).affectedKeys().hasOnly(['status']));
+    }
+
+    match /adminChanges/{changeId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidAdminChange(incoming());
+    }
+  }
+}
